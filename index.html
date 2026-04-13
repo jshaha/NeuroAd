@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroAd — Ad Brain Analysis</title>
+  <meta name="description" content="Upload an ad image, describe your audience and goal. NeuroAd predicts cortical activations and returns plain-English creative recommendations." />
+
+  <!-- Fonts: Sohne-style via Fontshare -->
+  <link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700,800,900&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      scroll-behavior: smooth;
+    }
+    body {
+      font-family: 'Switzer', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #0a2540;
+      background: #ffffff;
+      min-height: 100dvh;
+    }
+    img, canvas { display: block; max-width: 100%; }
+    button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+    input, textarea { font: inherit; }
+    h1,h2,h3,h4 { line-height: 1.15; letter-spacing: -0.02em; }
+    p { max-width: 65ch; }
+    ::selection { background: rgba(99, 91, 255, 0.15); }
+    :focus-visible { outline: 2px solid #635bff; outline-offset: 3px; border-radius: 4px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .page-wrap { max-width: 1120px; margin: 0 auto; padding: 0 40px; }
+    @media (max-width: 640px) { .page-wrap { padding: 0 20px; } }
+
+    /* ── Stripe-style mesh gradient background ───────────────────────────── */
+    .hero-bg {
+      position: absolute;
+      top: 0; right: 0;
+      width: 660px; height: 660px;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .hero-bg svg { width: 100%; height: 100%; }
+
+    /* ── Nav ─────────────────────────────────────────────────────────────── */
+    nav {
+      position: relative; z-index: 10;
+      border-bottom: 1px solid #e6ebf1;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position: sticky; top: 0;
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      max-width: 1120px; margin: 0 auto; padding: 0 40px;
+      height: 60px;
+    }
+    @media (max-width: 640px) { .nav-inner { padding: 0 20px; } }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none;
+    }
+    .nav-logo-icon {
+      width: 32px; height: 32px;
+    }
+    .nav-logo-text {
+      font-size: 20px; font-weight: 800;
+      color: #0a2540; letter-spacing: -0.03em;
+    }
+    .nav-logo-text span { color: #635bff; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    .nav-badge {
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px;
+      background: #fff8e6; color: #c97a06;
+      border: 1px solid #f5d78c;
+    }
+    .nav-docs {
+      font-size: 14px; font-weight: 500;
+      color: #425466;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: background 150ms, color 150ms;
+    }
+    .nav-docs:hover { background: #f5f8ff; color: #0a2540; }
+
+    /* ── Hero section ────────────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 88px 0 72px;
+    }
+    .hero-content { position: relative; z-index: 2; }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600;
+      color: #635bff; letter-spacing: 0.02em;
+      margin-bottom: 20px;
+    }
+    .hero-eyebrow-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #635bff; opacity: 0.6;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 58px);
+      font-weight: 900;
+      color: #0a2540;
+      max-width: 720px;
+      margin-bottom: 20px;
+    }
+    .hero h1 .gradient-text {
+      background: linear-gradient(90deg, #635bff 0%, #00d4ff 60%, #80e9ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 18px;
+      color: #425466;
+      max-width: 560px;
+      line-height: 1.65;
+      margin-bottom: 36px;
+    }
+    .hero-pills {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin-bottom: 48px;
+    }
+    .hero-pill {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 500; color: #425466;
+      background: #f6f9fc; border: 1px solid #e6ebf1;
+      border-radius: 20px; padding: 6px 14px;
+    }
+    .hero-pill svg { color: #635bff; }
+
+    /* ── Analysis form ───────────────────────────────────────────────────── */
+    .form-section { padding: 0 0 96px; }
+    .form-card {
+      background: #ffffff;
+      border: 1px solid #e6ebf1;
+      border-radius: 16px;
+      box-shadow: 0 2px 8px rgba(10,37,64,0.04), 0 8px 32px rgba(10,37,64,0.06);
+      overflow: hidden;
+    }
+
+    /* Stacked field rows */
+    .form-body {
+      padding: 0;
+    }
+    .form-row {
+      display: flex; align-items: center;
+      padding: 0 28px;
+      border-bottom: 1px solid #f0f3f8;
+      min-height: 64px;
+      gap: 0;
+      position: relative;
+    }
+    .form-row:last-child { border-bottom: none; }
+    .form-row-label {
+      font-size: 13px; font-weight: 600;
+      color: #0a2540;
+      width: 200px; flex-shrink: 0;
+      letter-spacing: -0.01em;
+    }
+    .form-row-label .sub {
+      display: block;
+      font-size: 11px; font-weight: 400;
+      color: #8898aa; margin-top: 1px;
+    }
+    .form-row-input {
+      flex: 1;
+      padding: 0 16px;
+      border-left: 1px solid #f0f3f8;
+      display: flex; align-items: center;
+    }
+    .form-row-input input[type="text"],
+    .form-row-input textarea {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      color: #0a2540;
+      outline: none;
+      resize: none;
+      line-height: 1.55;
+      padding: 22px 0;
+    }
+    .form-row-input input[type="text"]::placeholder,
+    .form-row-input textarea::placeholder { color: #c0cad6; }
+    .form-row:focus-within .form-row-input { background: #fafbff; }
+    .form-row:focus-within { z-index: 1; }
+
+    /* Upload row */
+    .upload-row-action {
+      display: flex; align-items: center; gap: 14px; flex: 1;
+      border-left: 1px solid #f0f3f8;
+      padding: 0 16px;
+      min-height: 64px;
+    }
+    .btn-upload {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 16px;
+      border: 1.5px solid #d9e0e8;
+      border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      color: #425466;
+      background: #fff;
+      transition: border-color 150ms, background 150ms, color 150ms;
+      position: relative; overflow: hidden; cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-upload input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .btn-upload:hover { border-color: #635bff; color: #635bff; background: #fafaff; }
+    .upload-filename {
+      font-size: 13px; color: #425466;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 260px;
+    }
+    .upload-filename.empty { color: #c0cad6; }
+    .upload-thumb {
+      width: 32px; height: 32px; border-radius: 6px;
+      object-fit: cover; display: none;
+      border: 1px solid #e6ebf1; flex-shrink: 0;
+    }
+    .upload-thumb.visible { display: block; }
+
+    /* Run button row */
+    .form-footer {
+      padding: 20px 28px 24px;
+      border-top: 1px solid #f0f3f8;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .btn-run {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 24px;
+      background: #635bff;
+      color: #fff;
+      font-size: 14px; font-weight: 700;
+      border-radius: 8px;
+      letter-spacing: -0.01em;
+      transition: background 150ms, transform 150ms, box-shadow 150ms;
+      box-shadow: 0 4px 12px rgba(99,91,255,0.28);
+    }
+    .btn-run:hover:not(:disabled) {
+      background: #4f46e5;
+      box-shadow: 0 6px 20px rgba(99,91,255,0.38);
+      transform: translateY(-1px);
+    }
+    .btn-run:active:not(:disabled) { transform: none; box-shadow: none; }
+    .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+    .form-footnote { font-size: 12px; color: #8898aa; }
+
+    /* ── Error ───────────────────────────────────────────────────────────── */
+    .error-bar {
+      display: none;
+      align-items: flex-start; gap: 10px;
+      background: #fff5f5;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 14px; color: #c0392b;
+      margin-bottom: 24px;
+    }
+    .error-bar.visible { display: flex; }
+    .error-bar svg { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Loading ─────────────────────────────────────────────────────────── */
+    .loading-panel {
+      display: none;
+      flex-direction: column; align-items: center;
+      padding: 64px 40px; gap: 28px; text-align: center;
+    }
+    .loading-panel.visible { display: flex; }
+    .loading-spinner-wrap {
+      position: relative; width: 56px; height: 56px;
+    }
+    .loading-ring {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2.5px solid transparent;
+      border-top-color: #635bff;
+      animation: spin 0.8s linear infinite;
+    }
+    .loading-ring-bg {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      border: 2.5px solid #e6ebf1;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-title {
+      font-size: 16px; font-weight: 700; color: #0a2540;
+    }
+    .loading-steps-list {
+      display: flex; flex-direction: column; gap: 10px;
+      align-items: flex-start;
+      list-style: none;
+    }
+    .loading-step {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: #8898aa;
+      transition: color 0.3s;
+    }
+    .loading-step.active { color: #0a2540; font-weight: 600; }
+    .loading-step.done { color: #27ae60; }
+    .step-check {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 1.5px solid currentColor;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 9px;
+    }
+    .loading-step.active .step-check { border-color: #635bff; color: #635bff; background: rgba(99,91,255,0.08); }
+    .loading-step.done .step-check { background: #27ae60; border-color: #27ae60; color: #fff; }
+
+    /* ── Results ─────────────────────────────────────────────────────────── */
+    .results {
+      display: none; flex-direction: column; gap: 0;
+      animation: fadeUp 0.4s ease forwards;
+    }
+    .results.visible { display: flex; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Results header band */
+    .results-header {
+      background: linear-gradient(135deg, #0a2540 0%, #1a3a5c 100%);
+      border-radius: 16px 16px 0 0;
+      padding: 28px 32px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .results-header-text h3 {
+      font-size: 18px; font-weight: 800;
+      color: #fff; letter-spacing: -0.02em;
+    }
+    .results-header-text p {
+      font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 2px;
+    }
+    .results-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: rgba(255,255,255,0.12);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; flex-shrink: 0;
+    }
+    .results-status {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 0 3px rgba(74,222,128,0.2);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.2); }
+      50%      { box-shadow: 0 0 0 5px rgba(74,222,128,0.1); }
+    }
+
+    /* Results body panels */
+    .results-body {
+      border: 1px solid #e6ebf1; border-top: none;
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+    }
+    .result-row {
+      border-bottom: 1px solid #f0f3f8;
+      padding: 28px 32px;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-row-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #8898aa;
+      margin-bottom: 16px;
+    }
+    .label-pill {
+      background: #f0f3f8; border-radius: 4px;
+      padding: 2px 8px;
+    }
+    .label-pill.amber { background: #fff8e6; color: #c97a06; }
+    .label-pill.green { background: #f0fdf4; color: #15803d; }
+
+    /* Image result */
+    .result-image-box {
+      border-radius: 10px; overflow: hidden;
+      background: #f6f9fc;
+      border: 1px solid #e6ebf1;
+      position: relative;
+    }
+    #result-image {
+      width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      display: block;
+    }
+    .result-image-badge {
+      position: absolute; bottom: 12px; right: 12px;
+      font-size: 11px; font-weight: 600;
+      background: rgba(10,37,64,0.75);
+      color: #fff;
+      padding: 4px 10px; border-radius: 20px;
+      backdrop-filter: blur(6px);
+    }
+
+    /* Chart */
+    #brain-chart { max-height: 320px; }
+
+    /* ── Region detail panel ──────────────────────────────────────────────── */
+    .region-detail {
+      display: none;
+      margin-top: 16px;
+      background: #fafbff;
+      border: 1.5px solid rgba(99,91,255,0.18);
+      border-radius: 12px;
+      padding: 20px 24px;
+      animation: fadeSlideIn 200ms ease;
+    }
+    .region-detail.visible { display: block; }
+    .region-detail-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .region-detail-name {
+      font-size: 18px; font-weight: 800; color: #0a2540; letter-spacing: -0.02em;
+    }
+    .region-detail-score {
+      font-size: 13px; font-weight: 700;
+      background: rgba(99,91,255,0.12); color: #635bff;
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .region-detail-tag {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: #8898aa; background: #f0f3f8; padding: 3px 8px; border-radius: 4px;
+    }
+    .region-detail-body {
+      font-size: 14px; color: #425466; line-height: 1.75; margin-bottom: 12px;
+    }
+    .region-detail-ad-tip {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: #fff8e6; border: 1px solid #fde89a;
+      border-radius: 8px; padding: 12px 14px;
+      font-size: 13px; color: #92400e; line-height: 1.6;
+    }
+    .region-detail-ad-tip svg { flex-shrink: 0; margin-top: 1px; color: #d97706; }
+    .region-close {
+      margin-left: auto; cursor: pointer;
+      font-size: 18px; color: #8898aa; line-height: 1;
+      background: none; border: none; padding: 0 2px;
+    }
+    .region-close:hover { color: #0a2540; }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Radar chart section ──────────────────────────────────────────────── */
+    .viz-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 700px) { .viz-row { grid-template-columns: 1fr; } }
+    .viz-card {
+      background: #fafbff;
+      border: 1px solid #e6ebf1;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .viz-card-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #8898aa;
+      margin-bottom: 14px;
+    }
+    #signal-radar { max-height: 240px; }
+    #heatmap-canvas { width: 100%; height: 220px; }
+
+    /* ── Activation heatmap grid ──────────────────────────────────────────── */
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+    .heatmap-cell {
+      border-radius: 8px;
+      padding: 8px 6px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 120ms, box-shadow 120ms;
+    }
+    .heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(99,91,255,0.15); }
+    .heatmap-cell-name {
+      font-size: 10px; font-weight: 700; color: #0a2540;
+      line-height: 1.2; margin-bottom: 3px;
+    }
+    .heatmap-cell-val {
+      font-size: 11px; font-weight: 800;
+    }
+
+    /* Summary */
+    .summary-body {
+      font-size: 15px; color: #425466; line-height: 1.75;
+      border-left: 3px solid #635bff;
+      padding-left: 20px;
+      background: #fafbff;
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+    }
+
+    /* Gap/Rec items */
+    .insight-list { display: flex; flex-direction: column; gap: 10px; }
+    .insight-item {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px; line-height: 1.65;
+      color: #425466;
+    }
+    .insight-item.gap {
+      background: #fffbf0;
+      border: 1px solid #fde89a;
+    }
+    .insight-item.rec {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+    }
+    .insight-icon { flex-shrink: 0; margin-top: 1px; }
+    .insight-icon.gap { color: #d97706; }
+    .insight-icon.rec { color: #16a34a; }
+    .rec-badge {
+      flex-shrink: 0;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #dcfce7; border: 1.5px solid #bbf7d0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: #15803d;
+      margin-top: 2px;
+    }
+
+    /* ── Stats strip ─────────────────────────────────────────────────────── */
+    .stats-strip {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      border-top: 1px solid #f0f3f8;
+    }
+    .stat-cell {
+      padding: 20px 24px;
+      border-right: 1px solid #f0f3f8;
+      text-align: center;
+    }
+    .stat-cell:last-child { border-right: none; }
+    .stat-value {
+      font-size: 18px; font-weight: 800;
+      color: #0a2540; letter-spacing: -0.03em;
+    }
+    .stat-label { font-size: 12px; color: #8898aa; margin-top: 2px; }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid #e6ebf1;
+      padding: 24px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+    }
+    @media (max-width: 640px) { footer { padding: 20px; } }
+    .footer-brand {
+      font-size: 14px; font-weight: 700; color: #0a2540;
+    }
+    .footer-brand span { color: #635bff; }
+    .footer-links {
+      display: flex; gap: 20px;
+    }
+    .footer-links a {
+      font-size: 12px; color: #8898aa; text-decoration: none;
+      transition: color 150ms;
+    }
+    .footer-links a:hover { color: #425466; }
+
+    /* ── Responsive tweaks ────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .hero { padding: 56px 0 48px; }
+      .hero h1 { font-size: 32px; }
+      .stats-strip { grid-template-columns: 1fr; }
+      .stat-cell { border-right: none; border-bottom: 1px solid #f0f3f8; }
+      .form-body { padding: 20px; }
+      .form-footer { padding: 16px 20px 20px; flex-direction: column; align-items: flex-start; }
+      .results-header { padding: 20px; flex-wrap: wrap; }
+      .result-row { padding: 20px; }
+    }
+
+    /* ── Animate in loading spin for btn ──────────────────────────────────── */
+    @keyframes btn-spin { to { transform: rotate(360deg); } }
+    .btn-spinner { animation: btn-spin 0.8s linear infinite; }
+
+    /* ── Model status banner ─────────────────────────────────────────────────── */
+    .model-status-banner {
+      display: none;
+      align-items: center; gap: 10px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 14px; font-weight: 500;
+      margin-bottom: 20px;
+      border: 1.5px solid;
+    }
+    .model-status-banner.visible { display: flex; }
+    .model-status-banner.offline {
+      background: #fff5f5;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+    .model-status-banner.checking {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+    .model-status-banner.online {
+      background: #f0fdf4;
+      border-color: #86efac;
+      color: #15803d;
+    }
+    .status-pulse {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .offline  .status-pulse { background: #ef4444; }
+    .checking .status-pulse { background: #f59e0b; animation: btn-spin 1s linear infinite; border-radius: 0; clip-path: polygon(50% 0,100% 100%,0 100%); }
+    .online   .status-pulse { background: #22c55e; }
+    .model-status-banner a { color: inherit; font-weight: 600; }
+
+    /* ── Encoder signal pills ────────────────────────────────────────────────── */
+    .signal-strip {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      padding: 16px 24px;
+      border-top: 1px solid #f0f3f8;
+    }
+    .signal-strip-label {
+      width: 100%;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #8898aa;
+      margin-bottom: 2px;
+    }
+    .signal-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+      border: 1px solid;
+    }
+    .signal-pill.detected   { background: #f0f9ff; border-color: #bae6fd; color: #0369a1; }
+    .signal-pill.undetected { background: #f8fafc; border-color: #e2e8f0; color: #94a3b8; }
+    .signal-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .detected   .signal-dot { background: #0ea5e9; }
+    .undetected .signal-dot { background: #cbd5e1; }
+
+    /* ── Ad archetype badge ──────────────────────────────────────────────────── */
+    .archetype-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+      background: rgba(99,91,255,0.08); color: #635bff;
+      border: 1px solid rgba(99,91,255,0.2);
+      margin-left: 8px; vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="#">
+      <!-- Brain logo mark -->
+      <svg class="nav-logo-icon" viewBox="0 0 32 32" fill="none" aria-label="NeuroAd">
+        <rect width="32" height="32" rx="8" fill="#635bff"/>
+        <path d="M9 18C9 13.5 11.5 10 15.5 10C15.5 10 14.8 12.5 14.8 15C14.8 17.5 15.5 20 15.5 22C12.5 22 9 21 9 18Z" fill="white" fill-opacity="0.7"/>
+        <path d="M23 18C23 13.5 20.5 10 16.5 10C16.5 10 17.2 12.5 17.2 15C17.2 17.5 16.5 20 16.5 22C19.5 22 23 21 23 18Z" fill="white"/>
+        <circle cx="12" cy="15" r="1.5" fill="white" fill-opacity="0.5"/>
+        <circle cx="20" cy="14" r="1.5" fill="white" fill-opacity="0.8"/>
+        <circle cx="19" cy="19" r="1" fill="white" fill-opacity="0.5"/>
+      </svg>
+      <span class="nav-logo-text">Neuro<span>Ad</span></span>
+    </a>
+    <div class="nav-right">
+      <span class="nav-badge" title="ResNet-50 + BOLD5000 linear probes — img2fmri methodology (Feilong et al. 2023)">BOLD5000 encoder</span>
+      <a class="nav-docs" href="https://apertureneuro.org/article/87545-img2fmri-a-python-package-for-predicting-group-level-fmri-responses-to-visual-stimuli-using-deep-neural-networks" target="_blank" rel="noopener">Methodology ↗</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <!-- Stripe-style mesh gradient -->
+  <div class="hero-bg" aria-hidden="true">
+    <svg viewBox="0 0 660 660" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="g1" cx="50%" cy="30%" r="60%">
+          <stop offset="0%" stop-color="#635bff" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#635bff" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="g2" cx="80%" cy="60%" r="50%">
+          <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="g3" cx="30%" cy="70%" r="55%">
+          <stop offset="0%" stop-color="#f97316" stop-opacity="0.12"/>
+          <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="g4" cx="70%" cy="20%" r="45%">
+          <stop offset="0%" stop-color="#ec4899" stop-opacity="0.14"/>
+          <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <rect width="660" height="660" fill="url(#g1)"/>
+      <rect width="660" height="660" fill="url(#g2)"/>
+      <rect width="660" height="660" fill="url(#g3)"/>
+      <rect width="660" height="660" fill="url(#g4)"/>
+    </svg>
+  </div>
+
+  <div class="page-wrap">
+    <div class="hero-content">
+      <div class="hero-eyebrow">
+        <span class="hero-eyebrow-dot"></span>
+        Powered by BOLD5000 · ResNet-50 · HCP MMP1.0 · Perplexity
+      </div>
+      <h1>
+        Decode how your ad<br/>
+        <span class="gradient-text">fires the brain.</span>
+      </h1>
+      <p class="hero-sub">
+        Upload any ad image. NeuroAd predicts cortical activation across 180 HCP brain regions and returns plain-English creative recommendations — in seconds.
+      </p>
+      <div class="hero-pills">
+        <span class="hero-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          BOLD5000 · HCP MMP1.0 · 20 regions
+        </span>
+        <span class="hero-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Results in ~10s
+        </span>
+        <span class="hero-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Perplexity interpretation
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Form ───────────────────────────────────────────────────────────────────── -->
+<section class="form-section">
+  <div class="page-wrap">
+
+    <!-- Model status banner -->
+    <div class="model-status-banner checking visible" id="model-status-banner">
+      <span class="status-pulse"></span>
+      <span id="model-status-text">Checking encoder status…</span>
+    </div>
+
+    <!-- Error -->
+    <div class="error-bar" id="error-bar" role="alert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="error-msg"></span>
+    </div>
+
+    <form id="analysis-form" novalidate>
+      <div class="form-card">
+
+        <!-- Form rows -->
+        <div class="form-body">
+
+          <!-- Upload row -->
+          <div class="form-row">
+            <div class="form-row-label">
+              Ad Creative
+              <span class="sub">JPEG, PNG, or WebP</span>
+            </div>
+            <div class="upload-row-action">
+              <label class="btn-upload" tabindex="0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload image
+                <input type="file" id="image-input" accept="image/*" required data-testid="input-image" />
+              </label>
+              <img class="upload-thumb" id="image-preview" alt="" />
+              <span class="upload-filename empty" id="upload-filename">No file chosen</span>
+            </div>
+          </div>
+
+          <!-- Demographic row -->
+          <div class="form-row">
+            <div class="form-row-label">
+              Target Demographic
+              <span class="sub">Who is this ad for?</span>
+            </div>
+            <div class="form-row-input">
+              <input
+                type="text"
+                id="demographic"
+                placeholder="e.g. Urban millennials 25–35, health-conscious, $60k–$100k HHI"
+                required
+                data-testid="input-demographic"
+              />
+            </div>
+          </div>
+
+          <!-- Desired response row -->
+          <div class="form-row">
+            <div class="form-row-label">
+              Desired Response
+              <span class="sub">What should they feel?</span>
+            </div>
+            <div class="form-row-input">
+              <textarea
+                id="desired-response"
+                rows="2"
+                placeholder="e.g. Strong emotional engagement and brand recall — triggering reward and memory circuits"
+                required
+                data-testid="input-desired-response"
+              ></textarea>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="form-footer">
+          <button class="btn-run" type="submit" id="run-btn" data-testid="button-run">
+            <svg id="btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Run Analysis
+          </button>
+          <span class="form-footnote">Typically takes 8–15 seconds</span>
+        </div>
+
+        <!-- Loading state (inside card) -->
+        <div class="loading-panel" id="loading-panel">
+          <div class="loading-spinner-wrap">
+            <div class="loading-ring-bg"></div>
+            <div class="loading-ring"></div>
+          </div>
+          <div>
+            <div class="loading-title">Analyzing your ad…</div>
+          </div>
+          <ul class="loading-steps-list" id="loading-steps">
+            <li class="loading-step" id="step-1"><span class="step-check"></span>Extracting ResNet-50 visual features</li>
+            <li class="loading-step" id="step-2"><span class="step-check"></span>Applying BOLD5000 linear probes → HCP regions</li>
+            <li class="loading-step" id="step-3"><span class="step-check"></span>Interpreting activation pattern</li>
+            <li class="loading-step" id="step-4"><span class="step-check"></span>Generating creative recommendations</li>
+          </ul>
+        </div>
+
+      </div>
+    </form>
+
+    <!-- ── Results ──────────────────────────────────────────────────────── -->
+    <div id="results" class="results" style="margin-top: 32px;">
+
+      <!-- Header -->
+      <div class="results-header">
+        <div class="results-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+          </svg>
+        </div>
+        <div class="results-header-text">
+          <h3>Analysis complete</h3>
+          <p id="results-subtitle">Top 20 HCP regions · ResNet-50 + BOLD5000 encoder · Perplexity interpretation</p>
+        </div>
+        <div class="results-status">
+          <span class="status-dot"></span>
+          <span>Live</span>
+        </div>
+      </div>
+
+      <div class="results-body">
+
+        <!-- Encoder signal strip -->
+        <div class="signal-strip" id="signal-strip" style="display:none">
+          <span class="signal-strip-label">Encoder detected in this ad</span>
+        </div>
+
+        <!-- Stats strip -->
+        <div class="stats-strip" id="stats-strip">
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-top-region">—</div>
+            <div class="stat-label">Top activated region</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-top-score">—</div>
+            <div class="stat-label">Peak activation</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-breadth">—</div>
+            <div class="stat-label">Regions &gt;60%</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-archetype">—</div>
+            <div class="stat-label">Ad archetype</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-encoder">BOLD5000</div>
+            <div class="stat-label">Encoder</div>
+          </div>
+        </div>
+
+        <!-- Ad image -->
+        <div class="result-row">
+          <div class="result-row-label">
+            <span class="label-pill">01</span> Analyzed creative
+          </div>
+          <div class="result-image-box">
+            <img id="result-image" src="" alt="Analyzed ad" />
+            <span class="result-image-badge" id="result-filename"></span>
+          </div>
+        </div>
+
+        <!-- Brain chart + region detail -->
+        <div class="result-row">
+          <div class="result-row-label">
+            <span class="label-pill">02</span> Cortical activation map — top 10 HCP regions
+            <span style="font-size:11px;color:#635bff;font-weight:500;margin-left:8px;letter-spacing:0">Click any bar to learn what that region does</span>
+          </div>
+          <canvas id="brain-chart" aria-label="Brain region activation chart"></canvas>
+          <!-- Region detail panel (shown on bar click) -->
+          <div class="region-detail" id="region-detail">
+            <div class="region-detail-header">
+              <span class="region-detail-name" id="rd-name"></span>
+              <span class="region-detail-score" id="rd-score"></span>
+              <span class="region-detail-tag" id="rd-tag"></span>
+              <button class="region-close" id="region-close" title="Close">×</button>
+            </div>
+            <p class="region-detail-body" id="rd-body"></p>
+            <div class="region-detail-ad-tip">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span id="rd-adtip"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Viz row: radar + heatmap -->
+        <div class="result-row">
+          <div class="result-row-label">
+            <span class="label-pill">03</span> Visual signal profile &amp; full region heatmap
+          </div>
+          <div class="viz-row">
+            <div class="viz-card">
+              <div class="viz-card-title">Content signal radar</div>
+              <canvas id="signal-radar" aria-label="Encoder signal radar chart"></canvas>
+            </div>
+            <div class="viz-card">
+              <div class="viz-card-title">All 20 HCP regions — click to explore</div>
+              <div class="heatmap-grid" id="heatmap-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="result-row">
+          <div class="result-row-label">
+            <span class="label-pill">04</span> Neural pattern summary
+          </div>
+          <p class="summary-body" id="summary-text"></p>
+        </div>
+
+        <!-- Gaps -->
+        <div class="result-row">
+          <div class="result-row-label">
+            <span class="label-pill amber">05</span> Activation gaps
+          </div>
+          <div class="insight-list" id="gaps-list"></div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="result-row">
+          <div class="result-row-label">
+            <span class="label-pill green">06</span> Creative recommendations
+          </div>
+          <div class="insight-list" id="recs-list"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────────────────────────── -->
+<footer>
+  <span class="footer-brand">Neuro<span>Ad</span></span>
+  <div class="footer-links">
+    <a href="https://bold5000-dataset.github.io/website/" target="_blank" rel="noopener">BOLD5000</a>
+    <a href="https://www.humanconnectome.org/software/hcp-mr-pipelines" target="_blank" rel="noopener">HCP Atlas</a>
+    <a href="https://docs.perplexity.ai" target="_blank" rel="noopener">Perplexity API</a>
+  </div>
+</footer>
+
+<!-- ── Scripts ────────────────────────────────────────────────────────────────── -->
+<script>
+const API = 'port/8000'.startsWith('__') ? 'http://localhost:8000' : 'port/8000';
+
+// ── Model health check ────────────────────────────────────────────────────────
+function setOffline(banner, text, msg) {
+  banner.className = 'model-status-banner offline visible';
+  text.innerHTML = `&#9888; Model offline: ${msg}. Run <code>uvicorn backend:app --port 8000</code>`;
+}
+
+async function checkModelHealth() {
+  const banner = document.getElementById('model-status-banner');
+  const text   = document.getElementById('model-status-text');
+  // Start in checking state
+  banner.className = 'model-status-banner checking visible';
+  text.textContent = 'Checking BOLD5000 encoder status…';
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(8000) });
+    const j = await r.json();
+    if (r.ok && j.encoder_ready) {
+      banner.className = 'model-status-banner online visible';
+      text.textContent = `BOLD5000 encoder online — ResNet-50 + linear probes ready (${j.regions || 20} HCP regions)`;
+    } else {
+      setOffline(banner, text, j.detail || 'Encoder not ready');
+    }
+  } catch(e) {
+    setOffline(banner, text, `Cannot reach backend at ${API} — is uvicorn running?`);
+  }
+}
+checkModelHealth();
+
+// ── Upload button ─────────────────────────────────────────────────────────────
+const fileInput   = document.getElementById('image-input');
+const previewImg  = document.getElementById('image-preview');
+const fileLabel   = document.getElementById('upload-filename');
+let selectedFile  = null;
+
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(file) {
+  selectedFile = file;
+  previewImg.src = URL.createObjectURL(file);
+  previewImg.classList.add('visible');
+  fileLabel.textContent = file.name;
+  fileLabel.classList.remove('empty');
+}
+
+// ── Loading steps ─────────────────────────────────────────────────────────────
+let stepInterval = null;
+function startSteps() {
+  let step = 0;
+  const steps = [...document.querySelectorAll('.loading-step')];
+  steps.forEach(s => s.classList.remove('active','done'));
+  steps[0].classList.add('active');
+  steps[0].querySelector('.step-check').textContent = '●';
+  stepInterval = setInterval(() => {
+    step++;
+    if (step < steps.length) {
+      steps[step-1].classList.remove('active'); steps[step-1].classList.add('done');
+      steps[step-1].querySelector('.step-check').textContent = '✓';
+      steps[step].classList.add('active');
+      steps[step].querySelector('.step-check').textContent = '●';
+    }
+  }, 2000);
+}
+function stopSteps() {
+  clearInterval(stepInterval);
+  document.querySelectorAll('.loading-step').forEach(s => {
+    s.classList.remove('active','done');
+    s.querySelector('.step-check').textContent = '';
+  });
+}
+
+// ── Region knowledge base ────────────────────────────────────────────────────
+const REGION_INFO = {
+  V1:    { tag: 'Primary Visual',    body: 'V1 is the first cortical stop for all visual input. High V1 activation means your ad is visually dense — fine texture, sharp edges, or heavy text demands attention at the most basic level of visual processing.', adTip: 'Sharp contrast and crisp typography drive V1 and create a sense of visual urgency. Consider whether your visual complexity serves the message or creates overload.' },
+  V2:    { tag: 'Secondary Visual',  body: 'V2 refines signals from V1, processing orientation, spatial frequency, and early color. It works with V1 to build the foundational visual representation of your ad.', adTip: 'V2 and V1 co-activating suggests visually rich content. Manage complexity so it amplifies rather than obscures your core message.' },
+  V3:    { tag: 'Motion & Form',     body: 'V3 integrates shape and motion signals, helping the viewer parse dynamic or complex visual forms. It bridges early vision with higher object recognition.', adTip: 'Motion in ads — even implied motion from diagonal lines or action poses — engages V3 and increases visual engagement.' },
+  V4:    { tag: 'Color & Form',      body: 'V4 is the brain\'s color-processing hub. It responds strongly to hue, saturation, and object shapes — critical for brand color recognition and emotional color associations.', adTip: 'Saturated, emotionally resonant colors (warm reds, deep blues) drive V4 and prime emotional responses. Your palette is doing active neurological work.' },
+  V3CD:  { tag: 'Dorsal Visual',     body: 'V3CD bridges ventral and dorsal visual streams, processing location and form together. It helps viewers understand where objects sit in the scene\'s visual space.', adTip: 'Strong figure-ground separation and intentional spatial layout amplify V3CD and clarify your visual hierarchy.' },
+  LOC:   { tag: 'Object Recognition',body: 'The Lateral Occipital Cortex (LOC) specializes in recognizing objects regardless of position, size, or viewpoint. It fires when the brain identifies a coherent "thing" in the scene.', adTip: 'High LOC means your product is being recognized as a salient object. Keep it isolated, well-lit, and uncluttered to maximize perceptual salience.' },
+  OPA:   { tag: 'Scene Geometry',    body: 'The Occipital Place Area (OPA) processes the geometric and spatial structure of scenes — walls, floors, open spaces — before consciously identifying the setting.', adTip: 'Architectural lines, room geometry, and spatial depth trigger OPA. Use strong scene structure to establish context instantly.' },
+  PPA:   { tag: 'Place Recognition', body: 'The Parahippocampal Place Area (PPA) is the brain\'s "where am I?" center. It fires for recognizable places — a beach, a kitchen, a stadium — and anchors emotional memory to locations.', adTip: 'Iconic, emotionally loaded environments maximize PPA and trigger place-based memory associations. Your setting carries as much weight as your product.' },
+  RSC:   { tag: 'Spatial Memory',    body: 'The Retrosplenial Cortex (RSC) links scenes to long-term spatial memory and navigation. It activates for familiar or landmark-rich environments and connects current visual input to stored memories.', adTip: 'Familiar, aspirational environments (luxury kitchen, dream vacation) prime RSC and make your ad feel personally relevant to the viewer.' },
+  OFA:   { tag: 'Face Detection',    body: 'The Occipital Face Area (OFA) is the earliest face-selective region — it detects that a face is present before identifying whose face it is. Even a partially visible face triggers it.', adTip: 'Even stylized or partially obscured faces trigger OFA. Include human faces early in the visual hierarchy to engage face-processing networks immediately.' },
+  FFA:   { tag: 'Face Identity',     body: 'The Fusiform Face Area (FFA) encodes facial identity, expression, and emotional state. FFA activation is one of the strongest predictors of emotional engagement in advertising.', adTip: 'Direct eye contact, expressive faces, and diverse representation all maximize FFA engagement and drive emotional recall — this is gold for brand connection.' },
+  TE2p:  { tag: 'Object Memory',     body: 'TE2p links visual object perception to semantic memory. It fires when seeing a familiar object activates associated meanings, memories, and brand associations.', adTip: 'Iconic product shapes, brand assets, and culturally recognizable objects drive TE2p and reinforce brand memory over time.' },
+  TF:    { tag: 'Semantic Context',  body: 'TF integrates visual and semantic information — not just what an object is, but what it means. It gives visual content its contextual and conceptual depth.', adTip: 'Contextually rich imagery that implies a lifestyle or value will drive TF and deepen message retention beyond the immediate viewing moment.' },
+  TPOJ1: { tag: 'Social Attention',  body: 'TPOJ1 at the temporoparietal junction is a hub for social cognition and theory of mind. It activates when processing socially meaningful scenes or people-in-context.', adTip: 'Showing people interacting, expressions with clear intent, or social situations primes TPOJ1 and increases empathy-driven engagement.' },
+  STSdp: { tag: 'Biological Motion', body: 'The Superior Temporal Sulcus (STSdp) processes biological motion — human movement, gestures, and dynamic social signals. It\'s a key node in social perception.', adTip: 'Dynamic poses, action shots, and implied movement activate STSdp and make ads feel more alive and socially engaging.' },
+  '55b': { tag: 'Language / Text',   body: 'Area 55b bridges visual and language cortex — involved in reading and visual word form processing. It activates strongly for text-heavy visual content.', adTip: 'Short, punchy copy in high-contrast typography drives 55b and ensures the message is linguistically encoded, not just visually scanned.' },
+  IPS1:  { tag: 'Spatial Attention', body: 'IPS1 (Intraparietal Sulcus) controls spatial attention — where in a scene the viewer allocates cognitive resources. It guides the attentional spotlight across the visual field.', adTip: 'Use visual hierarchy — a dominant focal point, leading lines, contrast-based emphasis — to guide the attentional spotlight toward your key message.' },
+  '11l': { tag: 'Reward Value',      body: 'Area 11l in the orbitofrontal cortex encodes reward value and desirability. It fires when visual content is associated with positive outcomes, pleasure, or high-value objects.', adTip: 'Aspirational imagery, premium cues, and sensory pleasure (food, luxury, nature) all drive 11l and increase the perceived value of your offer.' },
+  '13l': { tag: 'Emotion & Value',   body: 'Area 13l integrates emotional valence with reward signals, providing the emotional "charge" that makes certain ads feel exciting, desirable, or satisfying.', adTip: 'Positive emotional scenes, social proof imagery, and brand-consistent emotional narratives amplify 13l and create lasting affective associations.' },
+  a24:   { tag: 'Motivation',        body: 'Area a24 (anterior cingulate) integrates emotion with decision-making and motivation — the bridge between feeling and doing. It links reward with action.', adTip: 'Ads combining emotional resonance with a clear, motivating call-to-action fire a24 and increase conversion-oriented engagement.' },
+};
+
+// ── Bar chart ─────────────────────────────────────────────────────────────────
+let chart = null;
+function renderChart(scores) {
+  const entries = Object.entries(scores).slice(0,10);
+  const labels = entries.map(([k]) => k);
+  const values = entries.map(([,v]) => +(v*100).toFixed(1));
+
+  const bgColors = values.map((v) => {
+    const alpha = 0.5 + (v/100)*0.5;
+    return `rgba(99,91,255,${alpha})`;
+  });
+
+  const ctx = document.getElementById('brain-chart').getContext('2d');
+  if (chart) { chart.destroy(); chart = null; }
+
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Activation %',
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: 'rgba(99,91,255,0.8)',
+        borderWidth: 1,
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0a2540',
+          titleColor: '#fff',
+          bodyColor: 'rgba(255,255,255,0.7)',
+          padding: 10, cornerRadius: 8,
+          titleFont: { family: "'Switzer', sans-serif", weight: '700', size: 13 },
+          bodyFont:  { family: "'Switzer', sans-serif", size: 12 },
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.x.toFixed(1)}% — click bar to learn more`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          min: 0, max: 100,
+          grid: { color: '#f0f3f8' },
+          ticks: {
+            color: '#8898aa',
+            font: { family: "'Switzer', sans-serif", size: 11 },
+            callback: v => v + '%',
+          },
+          border: { color: 'transparent' },
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: '#0a2540',
+            font: { family: "'Switzer', sans-serif", weight: '600', size: 12 },
+          },
+          border: { color: 'transparent' },
+        }
+      },
+      onClick: (evt, elements) => {
+        if (elements.length > 0) {
+          const idx    = elements[0].index;
+          const region = labels[idx];
+          const score  = values[idx] / 100;
+          showRegionDetail(region, score);
+        }
+      },
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+      }
+    }
+  });
+}
+
+// ── Radar chart ───────────────────────────────────────────────────────────────
+let radarChart = null;
+function renderRadar(signals) {
+  const LABELS = ['Face', 'Scene', 'Text', 'Color', 'Contrast', 'Reward', 'Spatial', 'Object'];
+  const KEYS   = ['face','scene','text','color','contrast','reward','spatial','object'];
+  const values = KEYS.map(k => Math.round((signals[k] || 0) * 100));
+
+  const ctx = document.getElementById('signal-radar').getContext('2d');
+  if (radarChart) { radarChart.destroy(); radarChart = null; }
+
+  radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: LABELS,
+      datasets: [{
+        label: 'Signal strength',
+        data: values,
+        backgroundColor: 'rgba(99,91,255,0.12)',
+        borderColor: 'rgba(99,91,255,0.7)',
+        borderWidth: 2,
+        pointBackgroundColor: '#635bff',
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 600, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0a2540',
+          titleColor: '#fff',
+          bodyColor: 'rgba(255,255,255,0.75)',
+          padding: 10, cornerRadius: 8,
+          titleFont: { family: "'Switzer', sans-serif", weight: '700', size: 12 },
+          bodyFont:  { family: "'Switzer', sans-serif", size: 12 },
+          callbacks: { label: ctx => ` ${ctx.parsed.r}% signal strength` }
+        }
+      },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: { stepSize: 25, display: false },
+          grid:         { color: 'rgba(99,91,255,0.08)' },
+          angleLines:   { color: 'rgba(99,91,255,0.1)'  },
+          pointLabels:  {
+            font: { family: "'Switzer', sans-serif", weight: '600', size: 11 },
+            color: '#425466',
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Heatmap grid ──────────────────────────────────────────────────────────────
+function renderHeatmap(scores) {
+  const grid = document.getElementById('heatmap-grid');
+  grid.innerHTML = '';
+  const entries = Object.entries(scores);
+  const max = Math.max(...entries.map(([,v]) => v));
+
+  entries.forEach(([region, score]) => {
+    const pct = score / max;
+    const r = Math.round(240 - pct * 141);
+    const g = Math.round(238 - pct * 147);
+    const b = Math.round(255 - pct * 55);
+    const textColor = pct > 0.6 ? '#fff' : '#0a2540';
+    const valColor  = pct > 0.6 ? 'rgba(255,255,255,0.9)' : '#635bff';
+
+    const cell = document.createElement('div');
+    cell.className = 'heatmap-cell';
+    cell.style.background = `rgb(${r},${g},${b})`;
+    cell.title = `Click to learn about ${region}`;
+    cell.innerHTML = `
+      <div class="heatmap-cell-name" style="color:${textColor}">${region}</div>
+      <div class="heatmap-cell-val" style="color:${valColor}">${(score*100).toFixed(0)}%</div>`;
+    cell.addEventListener('click', () => showRegionDetail(region, score));
+    grid.appendChild(cell);
+  });
+}
+
+// ── Region detail panel ───────────────────────────────────────────────────────
+function showRegionDetail(region, score) {
+  const panel = document.getElementById('region-detail');
+  const info  = REGION_INFO[region] || {
+    tag:    'HCP Region',
+    body:   `${region} is a cortical region in the HCP MMP1.0 parcellation involved in visual and cognitive processing.`,
+    adTip:  `Consider how this region's function relates to your creative strategy.`
+  };
+
+  document.getElementById('rd-name').textContent  = region;
+  document.getElementById('rd-score').textContent = (score*100).toFixed(1) + '% activation';
+  document.getElementById('rd-tag').textContent   = info.tag;
+  document.getElementById('rd-body').textContent  = info.body;
+  document.getElementById('rd-adtip').textContent = info.adTip;
+
+  panel.classList.add('visible');
+  setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+}
+
+document.getElementById('region-close').addEventListener('click', () => {
+  document.getElementById('region-detail').classList.remove('visible');
+});
+
+// ── Form submit ─────────────────────────────────────────────────────────────
+document.getElementById('analysis-form').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const demographic     = document.getElementById('demographic').value.trim();
+  const desiredResponse = document.getElementById('desired-response').value.trim();
+  const errBar = document.getElementById('error-bar');
+  errBar.classList.remove('visible');
+
+  if (!selectedFile)    { showError('Please upload an ad image first.'); return; }
+  if (!demographic)     { showError('Please describe your target demographic.'); return; }
+  if (!desiredResponse) { showError('Please describe the desired psychological response.'); return; }
+
+  const runBtn    = document.getElementById('run-btn');
+  const loadPanel = document.getElementById('loading-panel');
+  const results   = document.getElementById('results');
+
+  runBtn.disabled = true;
+  document.getElementById('btn-icon').outerHTML = `<svg id="btn-icon" class="btn-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>`;
+  runBtn.childNodes[runBtn.childNodes.length - 1].textContent = ' Analyzing…';
+  loadPanel.classList.add('visible');
+  results.classList.remove('visible');
+  startSteps();
+
+  try {
+    const fd = new FormData();
+    fd.append('image', selectedFile);
+    fd.append('demographic', demographic);
+    fd.append('desired_response', desiredResponse);
+
+    const res = await fetch(`${API}/analyze`, { method: 'POST', body: fd });
+    if (!res.ok) {
+      let detail = `Server error (${res.status})`;
+      try { const j = await res.json(); detail = j.detail || detail; } catch(_) {}
+      throw new Error(detail);
+    }
+    const data = await res.json();
+    renderResults(data);
+
+  } catch(err) {
+    showError(err.message || 'Unexpected error. Check the backend logs.');
+  } finally {
+    stopSteps();
+    loadPanel.classList.remove('visible');
+    runBtn.disabled = false;
+    runBtn.innerHTML = `<svg id="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg> Run Analysis`;
+  }
+});
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-bar').classList.add('visible');
+}
+
+// ── renderResults ───────────────────────────────────────────────────────────
+function renderResults(data) {
+  const scores   = data.region_scores;
+  const interp   = data.interpretation;
+  const signals  = data.encoder_signals || {};
+  const archetype = data.ad_archetype || null;
+  const entries  = Object.entries(scores);
+  const topRegion = entries[0][0];
+  const topScore  = entries[0][1];
+
+  // ── Stats strip ───────────────────────────────────────────────────────────
+  document.getElementById('stat-top-region').textContent = topRegion;
+  document.getElementById('stat-top-score').textContent  = (topScore * 100).toFixed(1) + '%';
+  const breadth = entries.filter(([,v]) => v >= 0.6).length;
+  document.getElementById('stat-breadth').textContent    = breadth;
+  document.getElementById('stat-archetype').textContent  = archetype || 'Mixed';
+  document.getElementById('stat-encoder').textContent    = data.encoder_mode === 'real' ? 'BOLD5000' : 'Mock';
+
+  // ── Image ───────────────────────────────────────────────────────────────────
+  document.getElementById('result-image').src = URL.createObjectURL(selectedFile);
+  document.getElementById('result-filename').textContent = selectedFile.name;
+
+  // ── Signal strip ───────────────────────────────────────────────────────────
+  const signalStrip = document.getElementById('signal-strip');
+  const SIGNAL_LABELS = {
+    face:     { label: 'Face / People',  icon: '&#128100;' },
+    scene:    { label: 'Scene / Place',  icon: '&#127758;' },
+    text:     { label: 'Text Heavy',     icon: '&#128221;' },
+    color:    { label: 'Vivid Color',    icon: '&#127912;' },
+    contrast: { label: 'High Contrast',  icon: '&#9646;'   },
+    reward:   { label: 'Reward Cues',    icon: '&#11088;'  },
+    spatial:  { label: 'Spatial Depth',  icon: '&#128248;' },
+    object:   { label: 'Objects',        icon: '&#128230;' },
+  };
+  const detected = Object.entries(signals).filter(([,v]) => v >= 0.35);
+  if (detected.length > 0) {
+    signalStrip.innerHTML = '<span class="signal-strip-label">Encoder detected in this ad</span>';
+    if (archetype) signalStrip.innerHTML += `<span class="archetype-badge">${archetype}</span>`;
+    detected.sort((a,b) => b[1]-a[1]).forEach(([key, val]) => {
+      const info = SIGNAL_LABELS[key] || { label: key, icon: '' };
+      signalStrip.innerHTML += `<span class="signal-pill" title="${Math.round(val*100)}% confidence">${info.icon} ${info.label}</span>`;
+    });
+    signalStrip.style.display = 'flex';
+  } else {
+    signalStrip.style.display = 'none';
+  }
+
+  // ── Bar chart ───────────────────────────────────────────────────────────────
+  renderChart(scores);
+  document.getElementById('region-detail').classList.remove('visible');
+
+  // ── Radar + Heatmap ─────────────────────────────────────────────────────────
+  renderRadar(signals);
+  renderHeatmap(scores);
+
+  // ── Summary ──────────────────────────────────────────────────────────────────
+  document.getElementById('summary-text').textContent = interp.summary;
+
+  // ── Gaps ────────────────────────────────────────────────────────────────────
+  const gapsList = document.getElementById('gaps-list');
+  gapsList.innerHTML = '';
+  (interp.gaps || []).forEach(gap => {
+    const d = document.createElement('div');
+    d.className = 'insight-item gap';
+    d.innerHTML = `
+      <svg class="insight-icon gap" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span>${esc(gap)}</span>`;
+    gapsList.appendChild(d);
+  });
+
+  // ── Recommendations ───────────────────────────────────────────────────────────
+  const recsList = document.getElementById('recs-list');
+  recsList.innerHTML = '';
+  (interp.recommendations || []).forEach((rec, i) => {
+    const d = document.createElement('div');
+    d.className = 'insight-item rec';
+    d.innerHTML = `<span class="rec-badge">${i+1}</span><span>${esc(rec)}</span>`;
+    recsList.appendChild(d);
+  });
+
+  // ── Show results ─────────────────────────────────────────────────────────────
+  const resultsEl = document.getElementById('results');
+  resultsEl.classList.add('visible');
+  setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+<script data-pplx-inline-edit>
+(function(){
+  if(window===window.top)return;
+  function inlineAll(orig,clone){
+    if(orig.nodeType!==1)return;
+    try{
+      var cs=getComputedStyle(orig);
+      var t='';
+      for(var i=0;i<cs.length;i++){t+=cs[i]+':'+cs.getPropertyValue(cs[i])+';';}
+      clone.style.cssText=t;
+    }catch(e){}
+    var oc=orig.children,cc=clone.children;
+    for(var j=0;j<oc.length&&j<cc.length;j++){inlineAll(oc[j],cc[j]);}
+  }
+  function stripExternal(clone){
+    var imgs=clone.querySelectorAll('img');
+    for(var i=0;i<imgs.length;i++){
+      var s=imgs[i].getAttribute('src');
+      if(s&&!s.startsWith('data:'))imgs[i].removeAttribute('src');
+    }
+    var all=clone.querySelectorAll('*');
+    for(var i=0;i<all.length;i++){
+      var st=all[i].style.cssText;
+      if(st&&st.indexOf('url(')>=0){
+        all[i].style.cssText=st.replace(/url\(["']?(?!data:)[^)"']*["']?\)/gi,'none');
+      }
+    }
+  }
+  window.addEventListener('message',function(e){
+    if(!e.data||e.data.type!=='INLINE_EDIT_CAPTURE_REQUEST')return;
+    var scrollX=window.scrollX||window.pageXOffset||0;
+    var scrollY=window.scrollY||window.pageYOffset||0;
+    var w=window.innerWidth,h=window.innerHeight;
+    try{
+      var clone=document.documentElement.cloneNode(true);
+      var rm=clone.querySelectorAll('script,link[rel="stylesheet"],style');
+      for(var i=0;i<rm.length;i++){rm[i].remove();}
+      inlineAll(document.documentElement,clone);
+      stripExternal(clone);
+      var html=new XMLSerializer().serializeToString(clone);
+      var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'">'
+        +'<foreignObject width="100%" height="100%">'
+        +'<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+w+'px;height:'+h+'px;overflow:hidden">'
+        +'<div style="transform:translate(-'+scrollX+'px,-'+scrollY+'px);transform-origin:top left">'
+        +html+'</div></div></foreignObject></svg>';
+      var svgUrl='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+      var img=new Image();
+      img.onload=function(){
+        var c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0);
+        window.parent.postMessage({type:'INLINE_EDIT_SCREENSHOT_RESULT',dataUrl:c.toDataURL('image/png'),scrollX:scrollX,scrollY:scrollY},'*');
+      };
+      img.onerror=function(){
+        window.parent.postMessage({type:'INLINE_EDIT_SCREENSHOT_RESULT',dataUrl:null,scrollX:scrollX,scrollY:scrollY},'*');
+      };
+      img.src=svgUrl;
+    }catch(err){
+      window.parent.postMessage({type:'INLINE_EDIT_SCREENSHOT_RESULT',dataUrl:null,scrollX:scrollX,scrollY:scrollY},'*');
+    }
+  });
+})();
+</script></body>
+</html>
